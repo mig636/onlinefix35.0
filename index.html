@@ -3,194 +3,431 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlixHub - Versão Final</title>
+    <title>FlixHub - Versão Estável</title>
     <style>
         :root {
             --primary: #e50914;
             --dark: #141414;
             --light: #f5f5f5;
         }
-        body {
-            font-family: Arial, sans-serif;
+        * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
+        }
+        body {
+            font-family: Arial, sans-serif;
             background-color: var(--dark);
             color: var(--light);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
-        /* [Manter outros estilos] */
+        header {
+            background-color: #111;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .container {
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            flex: 1;
+        }
+        .movie-card {
+            background: #222;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 0.5rem;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .admin-panel {
+            background: #333;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+        input {
+            padding: 0.5rem;
+            margin: 0.5rem 0;
+            width: 100%;
+            background: #222;
+            color: white;
+            border: 1px solid #444;
+        }
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--dark);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
-    <!-- [Manter estrutura HTML anterior] -->
+    <!-- Tela de carregamento inicial -->
+    <div id="loading">
+        <h2>Carregando FlixHub...</h2>
+    </div>
+
+    <!-- Conteúdo principal -->
+    <header>
+        <h1>FlixHub</h1>
+        <button id="admin-btn" class="btn">Painel Admin</button>
+    </header>
+
+    <div class="container">
+        <!-- Conteúdo Principal -->
+        <div id="main-content">
+            <h2>Filmes Disponíveis</h2>
+            <div id="movies-container">
+                <p>Carregando filmes...</p>
+            </div>
+        </div>
+
+        <!-- Painel Admin -->
+        <div id="admin-content" class="hidden admin-panel">
+            <h2>Painel de Administração</h2>
+            <button id="logout-btn" class="btn">Sair</button>
+            
+            <form id="movie-form">
+                <h3>Adicionar Filme</h3>
+                <input type="text" id="movie-title" placeholder="Título" required>
+                <div id="parts-container">
+                    <input type="text" class="part-url" placeholder="URL YouTube (ex: https://youtu.be/ID_DO_VIDEO)" required>
+                </div>
+                <button type="button" id="add-part" class="btn">+ Adicionar Parte</button>
+                <button type="submit" class="btn">Salvar Filme</button>
+            </form>
+
+            <div id="admin-movies">
+                <p>Carregando lista de administração...</p>
+            </div>
+        </div>
+
+        <!-- Login -->
+        <div id="login-content" class="hidden admin-panel">
+            <h2>Login</h2>
+            <input type="password" id="password" placeholder="Senha (padrão: 123)">
+            <button id="login-btn" class="btn">Entrar</button>
+            <p id="login-error" style="color: red; display: none;">Senha incorreta!</p>
+        </div>
+    </div>
 
     <script>
+        // Sistema principal como um objeto
         const flixhub = {
             // Estado inicial
-            movies: [],
-            isLoggedIn: false,
+            config: {
+                password: "123",
+                maxParts: 4
+            },
+            data: {
+                movies: [],
+                isLoggedIn: false
+            },
             
             // Inicialização
             init: function() {
-                this.loadMovies();
+                console.log("Iniciando FlixHub...");
+                this.checkDependencies();
+                this.loadData();
+                this.setupUI();
                 this.setupEventListeners();
-                this.checkLogin();
-                this.renderMovies();
-                console.log("Sistema iniciado com", this.movies.length, "filmes");
-            },
-            
-            // Carrega filmes com verificação rigorosa
-            loadMovies: function() {
-                try {
-                    const saved = localStorage.getItem('flixhub-data');
-                    if (saved) {
-                        const data = JSON.parse(saved);
-                        
-                        // Verificação profunda dos dados
-                        if (data && Array.isArray(data.movies)) {
-                            this.movies = data.movies.filter(movie => 
-                                movie &&
-                                typeof movie === 'object' &&
-                                movie.id && typeof movie.id === 'string' &&
-                                movie.title && typeof movie.title === 'string' &&
-                                Array.isArray(movie.parts) &&
-                                movie.parts.every(part => typeof part === 'string')
-                            );
-                        }
-                        
-                        this.isLoggedIn = !!data?.isLoggedIn;
-                    }
-                } catch (e) {
-                    console.error("Erro ao carregar:", e);
-                    this.movies = [];
-                }
-            },
-            
-            // Salva todos os dados de forma segura
-            saveData: function() {
-                const data = {
-                    version: 2,
-                    lastUpdated: new Date().toISOString(),
-                    movies: this.movies,
-                    isLoggedIn: this.isLoggedIn
-                };
                 
+                // Esconde o loading após 1 segundo (simulando carregamento)
+                setTimeout(() => {
+                    document.getElementById('loading').classList.add('hidden');
+                    console.log("Sistema pronto");
+                }, 1000);
+            },
+            
+            // Verifica dependências
+            checkDependencies: function() {
                 try {
-                    localStorage.setItem('flixhub-data', JSON.stringify(data));
+                    if (typeof localStorage === 'undefined') {
+                        throw new Error("localStorage não disponível");
+                    }
                     return true;
                 } catch (e) {
-                    console.error("Erro ao salvar:", e);
-                    alert("Erro ao salvar! O navegador pode estar em modo privado.");
+                    this.showFatalError("Seu navegador não suporta recursos necessários. Use um navegador moderno.");
                     return false;
                 }
             },
             
-            // Renderização à prova de erros
-            renderMovies: function() {
-                const container = document.getElementById('movies-container');
-                const adminContainer = document.getElementById('admin-movies');
-                
-                if (!container || !adminContainer) {
-                    console.error("Containers não encontrados!");
-                    return;
+            // Carrega dados
+            loadData: function() {
+                try {
+                    const savedData = localStorage.getItem('flixhub-v2');
+                    if (savedData) {
+                        const parsed = JSON.parse(savedData);
+                        
+                        // Verificação de estrutura
+                        if (parsed && Array.isArray(parsed.movies)) {
+                            this.data.movies = parsed.movies.filter(movie => 
+                                movie && 
+                                movie.id && typeof movie.id === 'string' &&
+                                movie.title && typeof movie.title === 'string' &&
+                                Array.isArray(movie.parts)
+                            );
+                            this.data.isLoggedIn = !!parsed.isLoggedIn;
+                        }
+                    }
+                    console.log("Dados carregados:", this.data.movies.length, "filmes");
+                } catch (e) {
+                    console.error("Erro ao carregar dados:", e);
+                    this.data.movies = [];
                 }
-                
-                // Limpa os containers
-                container.innerHTML = '';
-                adminContainer.innerHTML = '';
-                
-                if (this.movies.length === 0) {
-                    container.innerHTML = '<p>Nenhum filme disponível</p>';
-                    adminContainer.innerHTML = '<p>Nenhum filme cadastrado</p>';
-                    return;
+            },
+            
+            // Salva dados
+            saveData: function() {
+                try {
+                    const toSave = {
+                        version: 2,
+                        lastUpdate: new Date().toISOString(),
+                        movies: this.data.movies,
+                        isLoggedIn: this.data.isLoggedIn
+                    };
+                    localStorage.setItem('flixhub-v2', JSON.stringify(toSave));
+                    return true;
+                } catch (e) {
+                    console.error("Erro ao salvar dados:", e);
+                    this.showError("Não foi possível salvar. Verifique o console.");
+                    return false;
                 }
-                
-                // Renderiza cada filme
-                this.movies.forEach(movie => {
-                    // Card normal
-                    const card = document.createElement('div');
-                    card.className = 'movie-card';
-                    card.innerHTML = `
-                        <h3>${this.escapeHtml(movie.title)}</h3>
-                        <p>${movie.parts.length} parte${movie.parts.length > 1 ? 's' : ''}</p>
-                        <button class="btn play-btn" data-id="${movie.id}">Assistir</button>
-                    `;
-                    container.appendChild(card);
-                    
-                    // Card admin
-                    const adminCard = document.createElement('div');
-                    adminCard.className = 'movie-card';
-                    adminCard.innerHTML = `
-                        <h3>${this.escapeHtml(movie.title)}</h3>
-                        <p>${movie.parts.length} URLs</p>
-                        <button class="btn delete-btn" data-id="${movie.id}">Remover</button>
-                    `;
-                    adminContainer.appendChild(adminCard);
+            },
+            
+            // Configura a interface
+            setupUI: function() {
+                this.showView(this.data.isLoggedIn ? 'admin' : 'main');
+                this.renderMovies();
+            },
+            
+            // Mostra a view correta
+            showView: function(view) {
+                const views = ['main', 'admin', 'login'];
+                views.forEach(v => {
+                    const el = document.getElementById(`${v}-content`);
+                    if (el) {
+                        el.classList.toggle('hidden', v !== view);
+                    }
                 });
-                
-                // Atualiza event listeners
-                this.updateEventListeners();
+            },
+            
+            // Renderiza os filmes
+            renderMovies: function() {
+                try {
+                    const mainContainer = document.getElementById('movies-container');
+                    const adminContainer = document.getElementById('admin-movies');
+                    
+                    if (!mainContainer || !adminContainer) {
+                        throw new Error("Elementos do DOM não encontrados");
+                    }
+                    
+                    // Limpa os containers
+                    mainContainer.innerHTML = '';
+                    adminContainer.innerHTML = '';
+                    
+                    if (this.data.movies.length === 0) {
+                        mainContainer.innerHTML = '<p>Nenhum filme disponível</p>';
+                        adminContainer.innerHTML = '<p>Nenhum filme cadastrado</p>';
+                        return;
+                    }
+                    
+                    // Renderiza cada filme
+                    this.data.movies.forEach(movie => {
+                        // Card principal
+                        const mainCard = document.createElement('div');
+                        mainCard.className = 'movie-card';
+                        mainCard.innerHTML = `
+                            <h3>${this.sanitize(movie.title)}</h3>
+                            <p>${movie.parts.length} parte${movie.parts.length !== 1 ? 's' : ''}</p>
+                            <button class="btn play-btn" data-id="${movie.id}">Assistir</button>
+                        `;
+                        mainContainer.appendChild(mainCard);
+                        
+                        // Card admin
+                        const adminCard = document.createElement('div');
+                        adminCard.className = 'movie-card';
+                        adminCard.innerHTML = `
+                            <h3>${this.sanitize(movie.title)}</h3>
+                            <p>${movie.parts.length} URL${movie.parts.length !== 1 ? 's' : ''}</p>
+                            <button class="btn delete-btn" data-id="${movie.id}">Remover</button>
+                        `;
+                        adminContainer.appendChild(adminCard);
+                    });
+                    
+                    // Atualiza listeners
+                    this.updateDynamicListeners();
+                    
+                } catch (e) {
+                    console.error("Erro ao renderizar filmes:", e);
+                    this.showError("Erro ao carregar filmes");
+                }
             },
             
             // Adiciona um novo filme
             addMovie: function(title, urls) {
-                // Validação rigorosa
-                if (!title || typeof title !== 'string' || title.trim() === '') {
-                    this.showError("Título inválido");
+                try {
+                    // Validação
+                    if (!title || typeof title !== 'string' || title.trim() === '') {
+                        throw new Error("Título inválido");
+                    }
+                    
+                    if (!urls || !Array.isArray(urls) || urls.length === 0) {
+                        throw new Error("Insira pelo menos uma URL");
+                    }
+                    
+                    // Processa URLs
+                    const processedUrls = urls
+                        .map(url => this.processYouTubeUrl(url))
+                        .filter(url => url !== null);
+                    
+                    if (processedUrls.length === 0) {
+                        throw new Error("Nenhuma URL válida do YouTube");
+                    }
+                    
+                    // Cria o filme
+                    const newMovie = {
+                        id: 'mv-' + Date.now(),
+                        title: title.trim(),
+                        parts: processedUrls,
+                        createdAt: new Date().toISOString()
+                    };
+                    
+                    // Adiciona e salva
+                    this.data.movies.push(newMovie);
+                    if (this.saveData()) {
+                        this.renderMovies();
+                        return true;
+                    }
+                    return false;
+                    
+                } catch (error) {
+                    this.showError(error.message);
+                    console.error("Erro ao adicionar filme:", error);
                     return false;
                 }
-                
-                if (!urls || !Array.isArray(urls) || urls.length === 0) {
-                    this.showError("Insira pelo menos uma URL");
-                    return false;
-                }
-                
-                // Processa URLs
-                const processedUrls = urls
-                    .map(url => this.cleanYouTubeUrl(url))
-                    .filter(url => url !== null);
-                
-                if (processedUrls.length === 0) {
-                    this.showError("Nenhuma URL válida do YouTube");
-                    return false;
-                }
-                
-                // Cria o filme
-                const newMovie = {
-                    id: 'm' + Date.now(),
-                    title: title.trim(),
-                    parts: processedUrls,
-                    addedAt: new Date().toISOString()
-                };
-                
-                // Adiciona e salva
-                this.movies.push(newMovie);
-                if (this.saveData()) {
-                    this.renderMovies();
-                    return true;
-                }
-                return false;
             },
             
-            // Limpa e valida URLs do YouTube
-            cleanYouTubeUrl: function(url) {
-                if (!url || typeof url !== 'string') return null;
-                
-                // Remove parâmetros malformados
-                const cleanUrl = url.split('?')[0].split('&')[0].split('7si=')[0];
-                
-                // Extrai o ID do vídeo
-                const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]{11}).*/;
-                const match = cleanUrl.match(regExp);
-                
-                return match && match[2] ? `https://youtu.be/${match[2]}` : null;
+            // Processa URL do YouTube
+            processYouTubeUrl: function(url) {
+                try {
+                    if (!url || typeof url !== 'string') return null;
+                    
+                    // Remove parâmetros malformados
+                    const cleanUrl = url.split('?')[0].split('&')[0].split('7si=')[0];
+                    
+                    // Expressão regular para extrair ID
+                    const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]{11}).*/;
+                    const match = cleanUrl.match(regExp);
+                    
+                    return match && match[2] ? `https://youtu.be/${match[2]}` : null;
+                } catch (e) {
+                    console.error("Erro ao processar URL:", e);
+                    return null;
+                }
             },
             
-            // [Manter outras funções como showError, escapeHtml, etc]
+            // Remove um filme
+            deleteMovie: function(id) {
+                try {
+                    const initialLength = this.data.movies.length;
+                    this.data.movies = this.data.movies.filter(movie => movie.id !== id);
+                    
+                    if (this.data.movies.length !== initialLength) {
+                        this.saveData();
+                        this.renderMovies();
+                        return true;
+                    }
+                    return false;
+                } catch (e) {
+                    console.error("Erro ao remover filme:", e);
+                    this.showError("Erro ao remover filme");
+                    return false;
+                }
+            },
             
-            // Configura todos os event listeners
+            // Reproduz um filme
+            playMovie: function(id) {
+                try {
+                    const movie = this.data.movies.find(m => m.id === id);
+                    if (movie) {
+                        // Aqui você pode implementar o player real
+                        alert(`Iniciando: ${movie.title}\nURLs:\n${movie.parts.join('\n')}`);
+                        return true;
+                    }
+                    return false;
+                } catch (e) {
+                    console.error("Erro ao reproduzir filme:", e);
+                    this.showError("Erro ao carregar filme");
+                    return false;
+                }
+            },
+            
+            // Configura event listeners estáticos
             setupEventListeners: function() {
+                // Botão admin
+                document.getElementById('admin-btn').addEventListener('click', () => {
+                    this.showView(this.data.isLoggedIn ? 'admin' : 'login');
+                });
+                
+                // Botão logout
+                document.getElementById('logout-btn').addEventListener('click', () => {
+                    this.data.isLoggedIn = false;
+                    this.saveData();
+                    this.showView('main');
+                });
+                
+                // Botão login
+                document.getElementById('login-btn').addEventListener('click', () => {
+                    const password = document.getElementById('password').value;
+                    if (password === this.config.password) {
+                        this.data.isLoggedIn = true;
+                        this.saveData();
+                        document.getElementById('login-error').style.display = 'none';
+                        this.showView('admin');
+                    } else {
+                        document.getElementById('login-error').style.display = 'block';
+                    }
+                });
+                
+                // Adicionar parte
+                document.getElementById('add-part').addEventListener('click', () => {
+                    const parts = document.querySelectorAll('.part-url');
+                    if (parts.length < this.config.maxParts) {
+                        const newPart = document.createElement('input');
+                        newPart.type = 'text';
+                        newPart.className = 'part-url';
+                        newPart.placeholder = `URL Parte ${parts.length + 1}`;
+                        document.getElementById('parts-container').appendChild(newPart);
+                    } else {
+                        this.showError(`Máximo de ${this.config.maxParts} partes por filme`);
+                    }
+                });
+                
                 // Formulário de filme
-                document.getElementById('movie-form').addEventListener('submit', e => {
+                document.getElementById('movie-form').addEventListener('submit', (e) => {
                     e.preventDefault();
                     const title = document.getElementById('movie-title').value;
                     const urls = Array.from(document.querySelectorAll('.part-url'))
@@ -203,32 +440,57 @@
                             '<input type="text" class="part-url" placeholder="URL YouTube" required>';
                     }
                 });
-                
-                // [Manter outros listeners]
             },
             
             // Atualiza listeners dinâmicos
-            updateEventListeners: function() {
-                // Botões de play
+            updateDynamicListeners: function() {
+                // Botões play
                 document.querySelectorAll('.play-btn').forEach(btn => {
-                    btn.addEventListener('click', e => {
-                        const id = e.target.getAttribute('data-id');
-                        this.playMovie(id);
+                    btn.addEventListener('click', (e) => {
+                        this.playMovie(e.target.dataset.id);
                     });
                 });
                 
-                // Botões de delete
+                // Botões delete
                 document.querySelectorAll('.delete-btn').forEach(btn => {
-                    btn.addEventListener('click', e => {
-                        const id = e.target.getAttribute('data-id');
-                        if (confirm('Remover este filme?')) {
-                            this.deleteMovie(id);
+                    btn.addEventListener('click', (e) => {
+                        if (confirm('Tem certeza que deseja remover este filme?')) {
+                            this.deleteMovie(e.target.dataset.id);
                         }
                     });
                 });
             },
             
-            // [Manter outras funções necessárias]
+            // Mostra erro
+            showError: function(message) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = message;
+                document.querySelector('.container').prepend(errorDiv);
+                
+                setTimeout(() => {
+                    errorDiv.remove();
+                }, 5000);
+            },
+            
+            // Mostra erro fatal
+            showFatalError: function(message) {
+                document.body.innerHTML = `
+                    <div style="color: white; background: red; padding: 20px;">
+                        <h1>Erro Crítico</h1>
+                        <p>${message}</p>
+                    </div>
+                `;
+            },
+            
+            // Sanitiza HTML
+            sanitize: function(text) {
+                return text
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
         };
 
         // Inicia quando o DOM estiver pronto
