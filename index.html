@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlixHub - Versão Final</title>
+    <style>
+        :root {
+            --primary: #e50914;
+            --dark: #141414;
+            --light: #f5f5f5;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--dark);
+            color: var(--light);
+        }
+        /* [Manter outros estilos] */
+    </style>
+</head>
+<body>
+    <!-- [Manter estrutura HTML anterior] -->
+
+    <script>
+        const flixhub = {
+            // Estado inicial
+            movies: [],
+            isLoggedIn: false,
+            
+            // Inicialização
+            init: function() {
+                this.loadMovies();
+                this.setupEventListeners();
+                this.checkLogin();
+                this.renderMovies();
+                console.log("Sistema iniciado com", this.movies.length, "filmes");
+            },
+            
+            // Carrega filmes com verificação rigorosa
+            loadMovies: function() {
+                try {
+                    const saved = localStorage.getItem('flixhub-data');
+                    if (saved) {
+                        const data = JSON.parse(saved);
+                        
+                        // Verificação profunda dos dados
+                        if (data && Array.isArray(data.movies)) {
+                            this.movies = data.movies.filter(movie => 
+                                movie &&
+                                typeof movie === 'object' &&
+                                movie.id && typeof movie.id === 'string' &&
+                                movie.title && typeof movie.title === 'string' &&
+                                Array.isArray(movie.parts) &&
+                                movie.parts.every(part => typeof part === 'string')
+                            );
+                        }
+                        
+                        this.isLoggedIn = !!data?.isLoggedIn;
+                    }
+                } catch (e) {
+                    console.error("Erro ao carregar:", e);
+                    this.movies = [];
+                }
+            },
+            
+            // Salva todos os dados de forma segura
+            saveData: function() {
+                const data = {
+                    version: 2,
+                    lastUpdated: new Date().toISOString(),
+                    movies: this.movies,
+                    isLoggedIn: this.isLoggedIn
+                };
+                
+                try {
+                    localStorage.setItem('flixhub-data', JSON.stringify(data));
+                    return true;
+                } catch (e) {
+                    console.error("Erro ao salvar:", e);
+                    alert("Erro ao salvar! O navegador pode estar em modo privado.");
+                    return false;
+                }
+            },
+            
+            // Renderização à prova de erros
+            renderMovies: function() {
+                const container = document.getElementById('movies-container');
+                const adminContainer = document.getElementById('admin-movies');
+                
+                if (!container || !adminContainer) {
+                    console.error("Containers não encontrados!");
+                    return;
+                }
+                
+                // Limpa os containers
+                container.innerHTML = '';
+                adminContainer.innerHTML = '';
+                
+                if (this.movies.length === 0) {
+                    container.innerHTML = '<p>Nenhum filme disponível</p>';
+                    adminContainer.innerHTML = '<p>Nenhum filme cadastrado</p>';
+                    return;
+                }
+                
+                // Renderiza cada filme
+                this.movies.forEach(movie => {
+                    // Card normal
+                    const card = document.createElement('div');
+                    card.className = 'movie-card';
+                    card.innerHTML = `
+                        <h3>${this.escapeHtml(movie.title)}</h3>
+                        <p>${movie.parts.length} parte${movie.parts.length > 1 ? 's' : ''}</p>
+                        <button class="btn play-btn" data-id="${movie.id}">Assistir</button>
+                    `;
+                    container.appendChild(card);
+                    
+                    // Card admin
+                    const adminCard = document.createElement('div');
+                    adminCard.className = 'movie-card';
+                    adminCard.innerHTML = `
+                        <h3>${this.escapeHtml(movie.title)}</h3>
+                        <p>${movie.parts.length} URLs</p>
+                        <button class="btn delete-btn" data-id="${movie.id}">Remover</button>
+                    `;
+                    adminContainer.appendChild(adminCard);
+                });
+                
+                // Atualiza event listeners
+                this.updateEventListeners();
+            },
+            
+            // Adiciona um novo filme
+            addMovie: function(title, urls) {
+                // Validação rigorosa
+                if (!title || typeof title !== 'string' || title.trim() === '') {
+                    this.showError("Título inválido");
+                    return false;
+                }
+                
+                if (!urls || !Array.isArray(urls) || urls.length === 0) {
+                    this.showError("Insira pelo menos uma URL");
+                    return false;
+                }
+                
+                // Processa URLs
+                const processedUrls = urls
+                    .map(url => this.cleanYouTubeUrl(url))
+                    .filter(url => url !== null);
+                
+                if (processedUrls.length === 0) {
+                    this.showError("Nenhuma URL válida do YouTube");
+                    return false;
+                }
+                
+                // Cria o filme
+                const newMovie = {
+                    id: 'm' + Date.now(),
+                    title: title.trim(),
+                    parts: processedUrls,
+                    addedAt: new Date().toISOString()
+                };
+                
+                // Adiciona e salva
+                this.movies.push(newMovie);
+                if (this.saveData()) {
+                    this.renderMovies();
+                    return true;
+                }
+                return false;
+            },
+            
+            // Limpa e valida URLs do YouTube
+            cleanYouTubeUrl: function(url) {
+                if (!url || typeof url !== 'string') return null;
+                
+                // Remove parâmetros malformados
+                const cleanUrl = url.split('?')[0].split('&')[0].split('7si=')[0];
+                
+                // Extrai o ID do vídeo
+                const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]{11}).*/;
+                const match = cleanUrl.match(regExp);
+                
+                return match && match[2] ? `https://youtu.be/${match[2]}` : null;
+            },
+            
+            // [Manter outras funções como showError, escapeHtml, etc]
+            
+            // Configura todos os event listeners
+            setupEventListeners: function() {
+                // Formulário de filme
+                document.getElementById('movie-form').addEventListener('submit', e => {
+                    e.preventDefault();
+                    const title = document.getElementById('movie-title').value;
+                    const urls = Array.from(document.querySelectorAll('.part-url'))
+                        .map(input => input.value)
+                        .filter(url => url.trim() !== '');
+                    
+                    if (this.addMovie(title, urls)) {
+                        e.target.reset();
+                        document.getElementById('parts-container').innerHTML = 
+                            '<input type="text" class="part-url" placeholder="URL YouTube" required>';
+                    }
+                });
+                
+                // [Manter outros listeners]
+            },
+            
+            // Atualiza listeners dinâmicos
+            updateEventListeners: function() {
+                // Botões de play
+                document.querySelectorAll('.play-btn').forEach(btn => {
+                    btn.addEventListener('click', e => {
+                        const id = e.target.getAttribute('data-id');
+                        this.playMovie(id);
+                    });
+                });
+                
+                // Botões de delete
+                document.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', e => {
+                        const id = e.target.getAttribute('data-id');
+                        if (confirm('Remover este filme?')) {
+                            this.deleteMovie(id);
+                        }
+                    });
+                });
+            },
+            
+            // [Manter outras funções necessárias]
+        };
+
+        // Inicia quando o DOM estiver pronto
+        document.addEventListener('DOMContentLoaded', () => {
+            flixhub.init();
+        });
+    </script>
+</body>
+</html>
